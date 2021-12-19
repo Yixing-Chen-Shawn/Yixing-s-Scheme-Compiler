@@ -8,6 +8,10 @@
 ;; TODO: replace with your `desugar` function
 (define (desugar-aux e)
   (match e
+    ['promise? (desugar-aux '(lambda (thunk) (and (prim vector? thunk)
+                                     (prim equal? (prim vector-length thunk) '3)
+                                     (prim equal? (prim vector-ref thunk '0) 'promise))))]
+    [`(promise? ,p) `(,(desugar-aux 'promise?) ,(desugar-aux p))]
     [(? prim? op) (if (member op '(+ - * /))
                       `(lambda args (apply-prim ,op args))
                       op)]
@@ -63,9 +67,7 @@
                    `([,xrest ,t0])
                    (cons x0 xs))
              ,ebody)))]
-    [`(if ,ec ,et ,ef) `(if ,(match ec
-                               [`(promise? ,e) `(promise? ,e)]
-                               [_ (desugar-aux ec)]) ,(desugar-aux et) ,(desugar-aux ef))]
+    [`(if ,ec ,et ,ef) `(if ,(desugar-aux ec) ,(desugar-aux et) ,(desugar-aux ef))]
     [`(and ,es ...)
      (match es
        [`() (desugar-aux `(quote #t))]
@@ -137,34 +139,36 @@
                          (if (number? ,thunk)
                              ,thunk
                              (quote "not promise")))))]
-#|`(if ,(mcar p)
+    #|`(if ,(mcar p)
           ,(mcdr p)
           ,(desugar-aux `(begin ,(set-mcar! p `#t)
                                 ,(set-mcdr! p (eval-core (desugar-aux (mcdr p))))
                                 ,(mcdr p))))]|#
-;; For this project, you may simply leave call/cc alone, we will
-;; be handling it in subsequent projects.
-[`(call/cc ,e) `(call/cc ,(desugar-aux e))]
-#|[`(apply ,ef ,ex)
+    ;; For this project, you may simply leave call/cc alone, we will
+    ;; be handling it in subsequent projects.
+    [`(call/cc ,e) `(call/cc ,(desugar-aux e))]
+    #|[`(apply ,ef ,ex)
 			 (define ef-d (desugar-aux ef))
 			 (define ex-d (first (rest ex)))
 			 (foldl (lambda (x acc)
 					  `(,acc ,x)) ef-d ex-d)]|#
-[`(apply ,ef ,ex)
- (match ef
-   [(? prim? ef) `(apply-prim ,ef ,(desugar-aux ex))]
-   [_ `(apply ,(desugar-aux ef) ,(desugar-aux ex))])]
-[`(,(? prim? op) ,es ...)
- (define args `(,@es))
- (match op
-   [`((promise? ,es)) (pretty-print es) `(promise? ,es)]
-   [_ `(prim ,op ,@(foldr (lambda (x acc)
-                            (if (prim? x)
-                                (cons `(lambda args (apply-prim ,x args)) acc)
-                                (cons (desugar-aux x) acc))) '() args))])]
-; have to quote all the inner datums, the syntax is '#(1 2 3) => (prim vector '1 '2 '3)|#
-[`#(,(? datum? dats) ...) (desugar-aux `(prim vector ,@(map (lambda (dat) (list 'quote dat)) dats)))]
-#|[`(,e0 ,e1)
+    [`(apply ,ef ,ex)
+     (match ef
+       [(? prim? ef) `(apply-prim ,ef ,(desugar-aux ex))]
+       [_  `(apply ,(desugar-aux ef) ,(desugar-aux ex))])]
+    [`(,(? prim? op) ,es ...)
+     ;;(define args `(,@es))
+     (match op
+       ;;['promise?  (desugar-aux `(promise? ,@es))]
+       [_ `(prim ,op ,@(foldr (lambda (x acc)
+                                (if (prim? x)
+                                    (cons `(lambda args ,(desugar-aux `(apply ,(if (equal? x 'promise?)
+                                                                                   (desugar-aux x)
+                                                                                   x) args))) acc)
+                                    (cons (desugar-aux x) acc))) '() es))])]
+    ; have to quote all the inner datums, the syntax is '#(1 2 3) => (prim vector '1 '2 '3)|#
+    [`#(,(? datum? dats) ...) (desugar-aux `(prim vector ,@(map (lambda (dat) (list 'quote dat)) dats)))]
+    #|[`(,e0 ,e1)
      (define args `(,e0 ,e1))
      (pretty-print "two args here" args)
      `(,@(foldr (lambda (x acc)
@@ -173,9 +177,9 @@
                      (define args (gensym 'args))
                      (cons `(lambda ,args (apply-prim ,x ,args)) acc)]
                     [_ (cons (desugar-aux x) acc)])) '() args))]|#
-[`(,es ...)
- (map (λ (e) (desugar-aux e)) es)]
-#|(define args `(,@es))
+    [`(,es ...)
+     (map (λ (e) (desugar-aux e)) es)]
+    #|(define args `(,@es))
      ;;(define args (map (lambda (e) (desugar-aux e)) es))
      ;;(pretty-print args)
      `(,@(foldr (lambda (x acc)
@@ -187,7 +191,7 @@
                                              (not (equal? x '(cond)))) (cons `(lambda args (apply-prim ,(desugar-aux x) args)) acc)]
                     [`(promise? ,e) (cons `(promise? ,e) acc)]
                     [_ (cons (desugar-aux x) acc)])) '() args))]|#
-[else (error `(unexpected-syntax: ,e))]))
+    [else (error `(unexpected-syntax: ,e))]))
 (define/contract (desugar e)
   (-> scheme-exp? core-exp?)
   (define (wrap e)
@@ -197,12 +201,68 @@
           ;; then used by code you generate in desugar-aux. For
           ;; example, my implementation defines (at least)
           ;; %raise-handler, promise?, and force.
-          [promise? (lambda (thunk) (and (vector? thunk)
+          #|[promise? (lambda (thunk) (and (vector? thunk)
                                          (equal? (vector-length thunk) '3)
-                                         (equal? (vector-ref thunk '0) 'promise)))]
+                                         (equal? (vector-ref thunk '0) 'promise)))]|#
           )
        ,e))
   (desugar-aux (wrap e)))
 
 ; I, First Last, pledge on my honor that I have not given or 
 ; received any unauthorized assistance on this project.
+
+
+(define test-2 '(+
+                 (foldl +
+                        '0
+                        (map (lambda (b) (if b '1 '2)) 
+                             (map promise?
+                                  (list
+                                   '#f
+                                   '#t
+                                   (delay '0)
+                                   (list)
+                                   (list '() '())
+                                   '#()
+                                   '#(0 1)
+                                   'yes))))
+ 
+                 (let ([x '0])
+                   (let ([p (delay (begin (set! x (+ '1 x)) x))])
+                     (let ([v (+ (force p) (force p) (force p))])
+                       (+ v x))))))
+
+
+(define test '(map promise?
+                   (list
+                    '#f
+                    '#t
+                    (delay '0)
+                    (list)
+                    (list '() '())
+                    '#()
+                    '#(0 1)
+                    'yes)))
+
+(define test-1 '(foldl +
+                       '0
+                       (map (lambda (b) (if b '1 '2)) 
+                            (map promise?
+                                 (list
+                                  '#f
+                                  '#t
+                                  (delay '0)
+                                  (list)
+                                  (list '() '())
+                                  '#()
+                                  '#(0 1)
+                                  'yes)))))
+
+#;(define test-2 '(let ([x '0])
+                  (let ([p (delay (begin (set! x (+ '1 x)) x))])
+                    (let ([v (+ (force p) (force p) (force p))])
+                      (+ v x)))))
+
+(eval-core (desugar test-2))
+
+(desugar-aux  test-2)
