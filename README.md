@@ -3,28 +3,28 @@
 ### Introduction:
 This is final project for CIS400/600 combined class for Intro. to Compiler Construction  in Fall 2021 at Syracuse University.
 This Scheme Compiler is written in nano-pass style and has following passes:
-+ Desugar: Desugars the output of top level into a smaller core language. Desugars things like letrec*/letrec, guard/raise, promises, cond, case, etc...
++ Desugar(desugar.rkt): Desugars the output of top level into a smaller core language. Desugars things like letrec*/letrec, guard/raise, promises, cond, case, etc...
 
 
-+ Simplify IR: Simplifies the intermediate representation produced by desugar and performs some optimizations, to make future passes easier. For example, (+) => 0, (+ 2) => 2, (+ 1 2 3 4) => (+ 1 (+ 2 (+ 3 4)).
++ Simplify IR(util.rkt): Simplifies the intermediate representation produced by desugar and performs some optimizations, to make future passes easier. For example, (+) => 0, (+ 2) => 2, (+ 1 2 3 4) => (+ 1 (+ 2 (+ 3 4)).
 
 
-+ Assignment Convert: Removes set! mutations by boxing all mutable variables inside of a size 1 vector.
++ Assignment Convert(cps.rkt): Removes set! mutations by boxing all mutable variables inside of a size 1 vector.
 
 
-+ Alphatize: Makes all binding names unique, removing shadowing.
++ Alphatize(cps.rkt): Makes all binding names unique, removing shadowing.
 
 
-+ ANF Convert: Flattens let forms with multiple bindings into nested lets. Removes all subexpressions by hoisting them to let bindings. This pass, combined with Alphatize, and Assignment Convert, give us an IR that is in Static Single Assigment (SSA) forms, in preparation for later passes.
++ ANF Convert(cps.rkt): Flattens let forms with multiple bindings into nested lets. Removes all subexpressions by hoisting them to let bindings. This pass, combined with Alphatize, and Assignment Convert, give us an IR that is in Static Single Assigment (SSA) forms, in preparation for later passes.
 
 
-+ CPS Convert: Converts our IR to continuation passing style, where no function call returns, and instead the current continuation is invoked. This makes it so that points that would have extended the stack are now closures (with an environment for free variable references), and we pass forward callback functions that will be called in tail position, eliminating the need for a stack.
++ CPS Convert(cps.rkt): Converts our IR to continuation passing style, where no function call returns, and instead the current continuation is invoked. This makes it so that points that would have extended the stack are now closures (with an environment for free variable references), and we pass forward callback functions that will be called in tail position, eliminating the need for a stack.
 
 
-+ Closure Convert: Removes all lambdas, replaces them with closures, with appropriate environment references, lifts variable references to let bindings, and removes variadic lambdas - by having all lambda take in one parameter of a list of arguments, then extracting the original expected arguments from that list. The phase outputs a list of procedure abstracts, with a minimal language.
++ Closure Convert(closure-convert.rkt): Removes all lambdas, replaces them with closures, with appropriate environment references, lifts variable references to let bindings, and removes variadic lambdas - by having all lambda take in one parameter of a list of arguments, then extracting the original expected arguments from that list. The phase outputs a list of procedure abstracts, with a minimal language.
 
 
-+ LLVM: With our IR now being in SSA, with continuation passing style, we can use the LLVM backend to compile our IR into executable bytecode. This pass takes the procedure output from the previous phase, and outputs strings of LLVM code that will produce an equivalent LLVM IR. This LLVM string is then concatenated to a LLVM compiled C++ header file (which contains some helper functions for things like primative operations and printing), and then compiled via clang++ into an executable bytecode file with default named bin.
++ LLVM(closure-convert.rkt): With our IR now being in SSA, with continuation passing style, we can use the LLVM backend to compile our IR into executable bytecode. This pass takes the procedure output from the previous phase, and outputs strings of LLVM code that will produce an equivalent LLVM IR. This LLVM string is then concatenated to a LLVM compiled C++ header file (which contains some helper functions for things like primative operations and printing), and then compiled via clang++ into an executable bytecode file with default named bin.
 ---
 ### Quickstart:
 ```text
