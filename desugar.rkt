@@ -8,6 +8,7 @@
 ;; TODO: replace with your `desugar` function
 (define (desugar-aux e)
   (match e
+    ;;here is the fix for preventing alphatizeing promise? in the alphatize pass. 
     ['promise? (desugar-aux '(lambda (thunk) (and (prim vector? thunk)
                                      (prim equal? (prim vector-length thunk) '3)
                                      (prim equal? (prim vector-ref thunk '0) 'promise))))]
@@ -106,6 +107,7 @@
                      [`(,guard ,expr) `(if ,guard ,expr ,acc)]
                      [`(,guard) `(if ,guard ,guard (prim void))]))
                  '() args-d)])]
+    
     [`(case ,key ,cases ...)
      (foldr (lambda (x acc)
               (match x
@@ -195,6 +197,7 @@
 (define/contract (desugar e)
   (-> scheme-exp? core-exp?)
   (define (wrap e)
+    ;; this let* makes life easy, but did cuase a lot of trouble potentially
     `(let*
          (
           ;; TODO: you may want to define functions here that may be
@@ -210,59 +213,3 @@
 
 ; I, First Last, pledge on my honor that I have not given or 
 ; received any unauthorized assistance on this project.
-
-
-(define test-2 '(+
-                 (foldl +
-                        '0
-                        (map (lambda (b) (if b '1 '2)) 
-                             (map promise?
-                                  (list
-                                   '#f
-                                   '#t
-                                   (delay '0)
-                                   (list)
-                                   (list '() '())
-                                   '#()
-                                   '#(0 1)
-                                   'yes))))
- 
-                 (let ([x '0])
-                   (let ([p (delay (begin (set! x (+ '1 x)) x))])
-                     (let ([v (+ (force p) (force p) (force p))])
-                       (+ v x))))))
-
-
-(define test '(map promise?
-                   (list
-                    '#f
-                    '#t
-                    (delay '0)
-                    (list)
-                    (list '() '())
-                    '#()
-                    '#(0 1)
-                    'yes)))
-
-(define test-1 '(foldl +
-                       '0
-                       (map (lambda (b) (if b '1 '2)) 
-                            (map promise?
-                                 (list
-                                  '#f
-                                  '#t
-                                  (delay '0)
-                                  (list)
-                                  (list '() '())
-                                  '#()
-                                  '#(0 1)
-                                  'yes)))))
-
-#;(define test-2 '(let ([x '0])
-                  (let ([p (delay (begin (set! x (+ '1 x)) x))])
-                    (let ([v (+ (force p) (force p) (force p))])
-                      (+ v x)))))
-
-(eval-core (desugar test-2))
-
-(desugar-aux  test-2)
