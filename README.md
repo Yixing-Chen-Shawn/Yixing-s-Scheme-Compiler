@@ -1,4 +1,4 @@
-##Yixing's Scheme Compiler
+## Yixing's Scheme Compiler
 
 ### Introduction:
 This is final project for CIS400/600 combined class for Intro. to Compiler Construction  in Fall 2021 at Syracuse University.
