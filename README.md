@@ -63,7 +63,7 @@ python3 tester.py -t public-case-1.scm
 There will be compiled llvm instruction produced in the combined.ll in each test folder. 
 
 ---
-###Features not implemented:
+### Features not implemented:
 + Boehm Garbage Collector:
   Implementation of the Boehm Garbage Collector.
 
